@@ -1,4 +1,4 @@
-FROM arm32v7/php:7-fpm
+FROM arm32v6/php:7-fpm-alpine
 
 LABEL maintainer="nobody@nowhere.com"
 
@@ -28,8 +28,7 @@ ENV PECL_BASE_URL="https://pecl.php.net/get"
 ENV PHP_EXT_DIR="/usr/src/php/ext"
 
 WORKDIR /var/www/passbolt
-RUN apt-get update \
-    && apt-get -y install --no-install-recommends $PASSBOLT_DEV_PACKAGES \
+RUN apk add --no-cache $PASSBOLT_DEV_PACKAGES \
          nginx \
          gnupg \
          libgpgme11 \
@@ -46,6 +45,8 @@ RUN apt-get update \
          curl -sSL $PECL_BASE_URL/$i | tar zxf - -C $PHP_EXT_DIR/$i --strip-components 1; \
        done \
     && docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ \
+    && cd $PHP_EXT_DIR/gnupg && phpize && ./configure && sed -i '/^CFLAGS / s/$/ -D_FILE_OFFSET_BITS=64/' Makefile \
+    && cd /var/www/passbolt \
     && docker-php-ext-install -j4 $PHP_EXTENSIONS $PECL_PASSBOLT_EXTENSIONS \
     && docker-php-ext-enable $PHP_EXTENSIONS $PECL_PASSBOLT_EXTENSIONS \
     && docker-php-source delete \
@@ -73,9 +74,9 @@ RUN apt-get update \
     && echo 'php_flag[expose_php] = off' > /usr/local/etc/php-fpm.d/expose.conf \
     && sed -i 's/# server_tokens/server_tokens/' /etc/nginx/nginx.conf
 
-COPY ../conf/passbolt.conf /etc/nginx/conf.d/default.conf
-COPY ../conf/supervisor/*.conf /etc/supervisor/conf.d/
-COPY ../bin/docker-entrypoint.sh /docker-entrypoint.sh
+COPY conf/passbolt.conf /etc/nginx/conf.d/default.conf
+COPY conf/supervisor/*.conf /etc/supervisor/conf.d/
+COPY bin/docker-entrypoint.sh /docker-entrypoint.sh
 
 EXPOSE 80 443
 
